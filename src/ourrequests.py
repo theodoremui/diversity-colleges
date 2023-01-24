@@ -1,11 +1,14 @@
 #########################################################################
-# 
+#
 # ourrequests.py
+#
+# @author: Phil Mui
+# @email: thephilmui@gmail.com
+# @date: Mon Jan 23 16:45:56 PST 2023
 #
 # Retry logic: bit.ly/requests-retry
 #########################################################################
 
-import os
 import random
 import time
 
@@ -18,16 +21,14 @@ BAD_HTTP_CODES = (400,401,403,404,406,408,409,410,429,500,502,503,504)
 USER_AGENT = UserAgent()
 
 HTTP_RETRIES = 6
-SCRAPINGDOG_KEY = os.environ.get("SCRAPINGDOG_KEY")
 SCRAPINGDOG_PROXY='https://api.scrapingdog.com/scrape'
-SCRAPINGDOG_PAYLOAD={'api_key': SCRAPINGDOG_KEY, 
+SCRAPINGDOG_PAYLOAD={'api_key': '63aca867fda5fa7f621167df', 
                     'url': '', 'wait':'5000', 'session_number':''}
 
 COUNTRY_CODE=['us','eu']
-SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY")
 SCRAPERAPI_DEVICETYPE=['desktop', 'mobile']
 SCRAPERAPI_PROXY='http://api.scraperapi.com'
-SCRAPERAPI_PAYLOAD={'api_key': SCRAPERAPI_KEY,
+SCRAPERAPI_PAYLOAD={'api_key': 'e370e7bd849ffb73b878cdc05368f28e',
                     'url': '', 'device_type': ''}
 
 HEADERS  = [
@@ -53,7 +54,7 @@ def requestWithProxy(url, numRetries=5):
     SCRAPINGDOG_PAYLOAD['session_number'] = random.randint(0,9999)
     result = requests.get(SCRAPINGDOG_PROXY, params=SCRAPINGDOG_PAYLOAD)
     if result.status_code == 200: 
-        html = result.text
+        html = result.text.strip()
         print(f"\tpr1: {len(html)}: {url}")
 
     # ScraperAPI
@@ -64,7 +65,7 @@ def requestWithProxy(url, numRetries=5):
         SCRAPERAPI_PAYLOAD['session_number'] = random.randint(0,9999)
         # SCRAPERAPI_PAYLOAD['render'] = 'true'
         result = requests.get(url = SCRAPERAPI_PROXY, params = SCRAPERAPI_PAYLOAD)
-        if result != None: html = result.text
+        if result != None: html = result.text.strip()
         print(f"\tpr2: {len(html)}: {url}")
     return html
 
@@ -74,7 +75,7 @@ async def asyncGet(url):
             # Get the response status code
             status = response.status
             # Read the response body
-            body = await response.text()
+            body = await response.text().strip()
             print(f"\tasy: {len(body)}: {url}")
             # print(f"\tpre: {status}: {body[:50]} ...")
 
@@ -102,7 +103,7 @@ def requestWithChrome(url, waitSeconds=1):
         print(f"\t{str(e)[:65]}")
     html = ""
     if CHROME_DRIVER.page_source != None:
-        html = CHROME_DRIVER.page_source.encode("utf-8")
+        html = CHROME_DRIVER.page_source.encode("utf-8").strip()
     print(f"\tchr: {len(html)}: {url}: ...{html[-7:]}")
     return html
 
@@ -121,7 +122,7 @@ def requestWithRetry(url, numRetries=HTTP_RETRIES):
     try:
         response = s.get(url, headers=random.choice(HEADERS))
         response.raise_for_status()
-        html = response.text
+        html = response.text.strip()
     except Exception as e:
         print(f"\trequest failed for {url}: {e}")
     s.close()
