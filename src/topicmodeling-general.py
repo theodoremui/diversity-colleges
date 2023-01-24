@@ -35,8 +35,8 @@ def printParquetInfo(df):
 def processSchoolByYear(df, start_year, end_year):
 
     results = []
-    print("{:10}{:10}{:10}{:10}{:10}{:10}".format(
-        "year", "num_docs", "trace", "norm1", "norm2", "pairwise"))
+    print("{:10}{:10}{:10}{:10}{:10}{:10}{:10}".format(
+        "year", "num_docs", "mention-norm", "trace", "norm1", "norm2", "pairwise"))
     for year in range(start_year, end_year+1):
         year_df = df[df.year==year]
 
@@ -48,8 +48,8 @@ def processSchoolByYear(df, start_year, end_year):
             pairwise = textutil.getNormalizedPairwiseDispersion(docvecs)
             cov = textutil.getCovDispersion(docvecs)
             
-            print("{:10}\t{:10}\t{:10.3e}\t{:10.3e}\t{:10.3e}\t{:10.3f}".format(
-                year, cov[0], cov[1], cov[2], cov[3], pairwise
+            print("{:10}{:10}{:10}{:10.3e}{:10.3e}{:10.3e}{:10.3f}".format(
+                year, cov[0], diversity_norm, cov[1], cov[2], cov[3], pairwise
             ))
             
             result = {'year':       year,
