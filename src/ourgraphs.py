@@ -43,7 +43,7 @@ def saveResults(results_df, school_name, section_name, start_year, end_year):
         ax.legend(loc='lower center')
 
         # Add x-label for the years
-        ax.set_title(column + ' regression slope: ' + "{.2e}".format(slope))
+        ax.set_title(column + ' slope: ' + "{:.2e}".format(slope))
         ax.set_xticks(results_df.index)
         ax.set_xticklabels(results_df.year)
         
