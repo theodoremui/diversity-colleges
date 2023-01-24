@@ -24,6 +24,6 @@ def getDocEmbeddings(doc_list):
     for doc in doc_list:
         sentences = sent_tokenize(doc)
         sentence_embeddings = __sentence_transformer.encode(sentences)
-        docvecs.append(np.mean(sentence_embeddings, axis=0))
+        docvecs.append(np.median(sentence_embeddings, axis=0))
 
     return docvecs
