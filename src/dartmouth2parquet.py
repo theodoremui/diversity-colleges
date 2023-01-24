@@ -1,12 +1,12 @@
 #########################################################################
-# berkeley2parquet.py
+# dartmouth2parquet.py
 # ------------------
-# Scraping UC Berkeley student paper opinion pieces with proxy services & 
+# Scraping Dartmouth University student paper opinion pieces with proxy services & 
 # saving to S3
 # 
 # @author Theodore Mui
 # @email theodoremui@gmail.com
-# @date Sat Jan  7 14:23:24 PST 2023
+# @date Mon Jan 16 18:42:58 PST 2023
 #
 # Retry logic: bit.ly/requests-retry
 #########################################################################
@@ -18,6 +18,7 @@ import sys
 import time
 import asyncio
 import pandas as pd
+from datetime import datetime
 from bs4 import *
 
 import ouraws
@@ -26,43 +27,38 @@ RETRIES = 6
 CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
 OUTPUT_DIR="data"
-SCHOOL="berkeley"
+SCHOOL="dartmouth"
 SUBJECT="opinion"
 CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-DATE_PATTERN = re.compile("https://dailycal.org/(\d+)/(\d+)/(\d+)")
-LISTING_BASE_URL = f"https://dailycal.org/section/{SUBJECT}/page/"
+LISTING_BASE_URL = f"https://www.thedartmouth.com/section/opinion?per_page=20&page="
 
+DATE_FORMAT="%m/%d/%y %I:%M%p"
 def getArticleText(url, numRetries, useProxy=False):
     attempts = 0
-    title = ""
-    body = ""
-    while attempts <= numRetries and len(title) < 5 and len(body) < 5: 
+    content = ""
+    dateObj = None
+    while attempts <= numRetries and len(content) < 5: 
         # only use proxy if we have tried and failed in attempt 0
-        if attempts > 2: useProxy = True
+        if attempts > 3: useProxy = True
         html = ourrequests.requestHtml(url, attempts, useProxy)
         soup = BeautifulSoup(html, 'html.parser')
-        titleObj = soup.select_one("p[class^='Article_articleTitle']")
-        bodyObj  = soup.select_one("div[class^='ArticleContent_story']")
-        imageObj = soup.select_one("div[class^='ArticleImage_container'] > img")
-        if titleObj != None: title = titleObj.text
-        if bodyObj != None:  body  = bodyObj.text
-        if len(body) < 5 and imageObj != None and imageObj.get('src') != None: 
-            body = imageObj.get('src')
+        contentObj  = soup.select_one("article.main")
+        dateObj = soup.select_one("span.date-and-time")
+        if contentObj is not None:  content = contentObj.text.strip()
+        if dateObj is not None: dateObj = datetime.strptime(dateObj.text, DATE_FORMAT)
         attempts += 1
 
         # give the website a small break before next ping
-        time.sleep(random.randint(0, 100 * attempts) / 100.0)
+        time.sleep(random.randint(0, 100 * attempts) / 1000.0)
 
-    text = title + "\n" + body.strip()
-    print(f"\t\t\t{len(text)} ...{text[-18:]}")
-    return text
+    print(f"\t\t\t{len(content)} ...{content[-18:]}")
+    return content, dateObj
 
-ARTICLE_BASE_URL = f"https://dailycal.org"
-ARTICLE_SELECTOR = \
-    "div:not([class]) > " + \
-    "div[class^='ArticlePreview'] > " + \
-    "a[href^='/']:not([class]):has(> div[class^='ArticlePreview'])"
+ARTICLE_SELECTOR1 = \
+    "article[class^='art'] h6[class^='art'] a[href^='https://www.thedartmouth.com/article/']"
+ARTICLE_SELECTOR2 = \
+    "article[class^='art'] h4[class^='art'] a[href^='https://www.thedartmouth.com/article/']"
 
 def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
     ''' Get articles linked off listing pages
@@ -75,18 +71,20 @@ def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
         if attempts > 3: useProxy = True
         html = ourrequests.requestHtml(listUrl, attempts, useProxy)
         soup = BeautifulSoup(html, "html.parser")
-        articleList = soup.select(ARTICLE_SELECTOR)
+        list1 = soup.select(ARTICLE_SELECTOR1)
+        if list1 is not None and len(list1) > 0: articleList += list1
+        list2 = soup.select(ARTICLE_SELECTOR2)
+        if list2 is not None and len(list2) > 0: articleList += list2
+
         if showProgress: print(f"\tretrieved: {len(articleList)}")
         attempts += 1
-        if len(articleList) == 0:
-            # give the website a small break before next ping
-            time.sleep(random.randint(0, 100 * attempts) / 100.0)
 
     return articleList
 
 def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
     failedPages = []
     articles = []
+    dateObj = None
     for pageNumber in pageList:
         articleList = getArticleList(baseURL+str(pageNumber), 
                                      RETRIES, showProgress, useProxy)
@@ -94,25 +92,25 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
         if len(articleList) == 0: failedPages.append(pageNumber)
         else:
             for article in articleList:
-                url = ARTICLE_BASE_URL + article.get('href')
-                date_groups = DATE_PATTERN.search(url)
-                if article.text != None and len(article.text) > 0:
-                    body = getArticleText(url, RETRIES)
+                url = article.get('href')
+                if article.text != None and len(article.text) > 0 and \
+                   url is not None and len(url) > 10:
+                    body, dateObj = getArticleText(url, RETRIES)
                     articles.append({ 
-                        'title' : article.select_one('h4').text,
+                        'title' : article.text,
                         'url'   : url,
                         'body'  : body,
-                        'year'  : int(date_groups.group(1)), # year
-                        'month' : int(date_groups.group(2)), # month
-                        'day'   : int(date_groups.group(3))  # day
+                        'year'  : dateObj.year,
+                        'month' : dateObj.month,
+                        'day'   : dateObj.day
                     })
                     wordCount += body.count(' ')
-        if pageNumber % CHECKPOINT_FREQUENCY == 0:
+        if pageNumber % CHECKPOINT_FREQUENCY == 0: 
             ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
         if showProgress: 
-            print("-> {} : {} : {} : {}"
+            print("-> {} : {} : {} : {} : {}"
                   .format(pageNumber, len(articleList), wordCount, 
-                          baseURL+str(pageNumber)))
+                          baseURL+str(pageNumber), dateObj))
             print(f"\t{failedPages}")
         pageNumber += 1
     df = ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
@@ -144,12 +142,12 @@ def startProcessing(startPage, endPage, numRetries):
     print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
 
     ouraws.saveByYear(df, output_dir=OUTPUT_DIR, 
-                      prefix=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}")
+                    prefix=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}")
 
 
 def printUsage(progname):
     print("Usage: python {} <startPage> <endPage> <numRetries>".format(
-        progname.split('/')[-1]
+        progname
     ))
 
 #=====================================================================
@@ -158,7 +156,6 @@ def printUsage(progname):
 if __name__ == "__main__":
 
     if len(sys.argv) != 4:
-        print(len(sys.argv))
         printUsage(sys.argv[0]) 
         sys.exit(0)
 

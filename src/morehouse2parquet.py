@@ -1,15 +1,15 @@
-#########################################################################
-# berkeley2parquet.py
-# ------------------
-# Scraping UC Berkeley student paper opinion pieces with proxy services & 
-# saving to S3
-# 
-# @author Theodore Mui
-# @email theodoremui@gmail.com
-# @date Sat Jan  7 14:23:24 PST 2023
-#
-# Retry logic: bit.ly/requests-retry
-#########################################################################
+# #########################################################################
+# # morehouse2parquet.py
+# # ------------------
+# # Scraping Morehouse College student paper opinion pieces with proxy 
+# # services & saving to S3
+# # 
+# # @author Theodore Mui
+# # @email theodoremui@gmail.com
+# # @date Sat Jan 14 18:40:25 PST 2023
+# #
+# # Retry logic: bit.ly/requests-retry
+# #########################################################################
 
 import os
 import re
@@ -26,12 +26,12 @@ RETRIES = 6
 CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
 OUTPUT_DIR="data"
-SCHOOL="berkeley"
+SCHOOL="morehouse"
 SUBJECT="opinion"
 CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-DATE_PATTERN = re.compile("https://dailycal.org/(\d+)/(\d+)/(\d+)")
-LISTING_BASE_URL = f"https://dailycal.org/section/{SUBJECT}/page/"
+DATE_PATTERN = re.compile("https://maroontigermedia.com/(\d+)/(\d+)/(\d+)")
+LISTING_BASE_URL = f"https://maroontigermedia.com/category/{SUBJECT}/page/"
 
 def getArticleText(url, numRetries, useProxy=False):
     attempts = 0
@@ -58,7 +58,7 @@ def getArticleText(url, numRetries, useProxy=False):
     print(f"\t\t\t{len(text)} ...{text[-18:]}")
     return text
 
-ARTICLE_BASE_URL = f"https://dailycal.org"
+ARTICLE_BASE_URL = f"https://maroontigermedia.com"
 ARTICLE_SELECTOR = \
     "div:not([class]) > " + \
     "div[class^='ArticlePreview'] > " + \
@@ -104,7 +104,7 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
                         'body'  : body,
                         'year'  : int(date_groups.group(1)), # year
                         'month' : int(date_groups.group(2)), # month
-                        'day'   : int(date_groups.group(3))  # day
+                        'day'  : int(date_groups.group(3))  # day
                     })
                     wordCount += body.count(' ')
         if pageNumber % CHECKPOINT_FREQUENCY == 0:
@@ -170,22 +170,3 @@ if __name__ == "__main__":
         startProcessing(startPage, endPage, numRetries)
     except Exception as e:
         print(f"Exception: {e}")
-
-
-#############
-# Testing getting a specific content page or list of content
-#############
-# if __name__ == "__main__":
-#     url = 'https://dailycal.org/2016/10/20/solidarity-and-space'
-#     text = getArticleText(url, 2)
-#
-#     print(f"article: {text}")
-
-#############
-# Testing proxy for getting list of articles
-#############
-# if __name__ == "__main__":
-#     articleList = getArticleList(LISTING_BASE_URL+str(230), 
-#                                  HTTP_RETRIES, True)
-#     print(len(articleList))
-#     print("\n".join([a.get('href') for a in articleList]))
