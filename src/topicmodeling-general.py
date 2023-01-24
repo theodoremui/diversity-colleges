@@ -10,10 +10,12 @@
 
 import sys
 import numpy as np
+import pandas as pd
 
 import textutil
 import ouraws
 import ourembeddings
+import ourgraphs
 
 DATA_DIR = 'data'
 
@@ -33,7 +35,8 @@ def printParquetInfo(df):
 def processSchoolByYear(df, start_year, end_year):
 
     results = []
-    print("year\tnum_docs\ttrace\tnorm1\tnorm2\tpairwise")
+    print("{:10}{:10}{:10}{:10}{:10}{:10}".format(
+        "year", "num_docs", "trace", "norm1", "norm2", "pairwise"))
     for year in range(start_year, end_year+1):
         year_df = df[df.year==year]
 
@@ -44,7 +47,7 @@ def processSchoolByYear(df, start_year, end_year):
             pairwise = textutil.getNormalizedPairwiseDispersion(docvecs)
             cov = textutil.getCovDispersion(docvecs)
             
-            print("{}\t{}\t{:.3e}\t{:.3e}\t{:.3e}\t{:.3f}".format(
+            print("{:10}\t{:10}\t{:10.3e}\t{:10.3e}\t{:10.3e}\t{:10.3f}".format(
                 year, cov[0], cov[1], cov[2], cov[3], pairwise
             ))
             
@@ -58,7 +61,7 @@ def processSchoolByYear(df, start_year, end_year):
                     'norm-inf':     cov[4], 
                     }
             results.append(result)
-    return results
+    return pd.DataFrame.from_records(results)
 
 
 def processSchool(school_name, section_name, start_year, end_year):
@@ -68,7 +71,10 @@ def processSchool(school_name, section_name, start_year, end_year):
     raw = ouraws.getFromS3(S3OBJECT_KEY)
     printParquetInfo(raw)
 
-    results = processSchoolByYear(raw, start_year, end_year)
+    results_df = processSchoolByYear(raw, start_year, end_year)
+    results_df.set_index('year')
+    ourgraphs.saveResults(results_df, school_name, section_name, 
+                          start_year, end_year)
 
 #=====================================================================
 # main
