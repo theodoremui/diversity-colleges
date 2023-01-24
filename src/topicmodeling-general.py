@@ -42,7 +42,8 @@ def processSchoolByYear(df, start_year, end_year):
 
         if year_df.shape[0] > 0:
             docs, diversity_norm = textutil.filterText(year_df.body) 
-            docvecs = ourembeddings.getDocEmbeddings(docs.tolist())
+            # docvecs = ourembeddings.getDocEmbeddings(docs.tolist())
+            docvecs = ourembeddings.getTFIDFDocEmbeddings(docs.tolist())
                         
             pairwise = textutil.getNormalizedPairwiseDispersion(docvecs)
             cov = textutil.getCovDispersion(docvecs)
