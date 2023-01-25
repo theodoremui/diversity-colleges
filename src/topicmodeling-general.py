@@ -9,6 +9,7 @@
 #########################################################################
 
 import sys
+import time
 import numpy as np
 import pandas as pd
 
@@ -35,21 +36,21 @@ def printParquetInfo(df):
 def processSchoolByYear(df, start_year, end_year):
 
     results = []
-    print("{:10}{:10}{:10}{:10}{:10}{:10}".format(
-        "year", "num_docs", "trace", "norm1", "norm2", "pairwise"))
+    print("{:<10}{:<10}{:<10}{:<10}{:<10}{:<10}{:<10}".format(
+        "year", "num_docs", "mentions", "trace", "norm1", "norm2", "pairwise"))
     for year in range(start_year, end_year+1):
         year_df = df[df.year==year]
 
         if year_df.shape[0] > 0:
             docs, diversity_norm = textutil.filterText(year_df.body) 
-            # docvecs = ourembeddings.getDocEmbeddings(docs.tolist())
-            docvecs = ourembeddings.getTFIDFDocEmbeddings(docs.tolist())
+            docvecs = ourembeddings.getDocEmbeddings(docs.tolist())
+            # docvecs = ourembeddings.getTFIDFDocEmbeddings(docs.tolist())
                         
             pairwise = textutil.getNormalizedPairwiseDispersion(docvecs)
             cov = textutil.getCovDispersion(docvecs)
             
-            print("{:10}\t{:10}\t{:10.3e}\t{:10.3e}\t{:10.3e}\t{:10.3f}".format(
-                year, cov[0], cov[1], cov[2], cov[3], pairwise
+            print("{:<10}{:<10}{:<10}{:<10.3e}{:<10.3e}{:<10.3e}{:<10.3f}".format(
+                year, cov[0], diversity_norm, cov[1], cov[2], cov[3], pairwise
             ))
             
             result = {'year':       year,
@@ -94,6 +95,9 @@ if __name__ == "__main__":
     try:
         start_year = int(sys.argv[3])
         end_year = int(sys.argv[4])
+        start_time = time.time()
         processSchool(sys.argv[1], sys.argv[2], start_year, end_year)
+        minutes, seconds = divmod(time.time() - start_time, 60)
+        print("elapsed time: {0:.0f}m {1:.2f}s".format(minutes, seconds))
     except Exception as e:
         print(f"error message: {e}")
