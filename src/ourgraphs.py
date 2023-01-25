@@ -14,9 +14,7 @@ from scipy.stats import linregress
 
 plt.rcParams['figure.dpi'] = 140
 
-def saveResults(results_df, school_name, section_name, start_year, end_year):
-    # Select the columns to plot
-    columns = ["mention-norm", "trace", "norm-1", "pairwise"]
+def showTopicsResults(results_df, title, columns):
 
     # Create a figure with subplots
     fig, axs = plt.subplots(nrows=len(columns), ncols=1, sharex=True, 
@@ -31,7 +29,7 @@ def saveResults(results_df, school_name, section_name, start_year, end_year):
         # Calculate the linear regression
         slope, intercept, r_value, p_value, std_err = linregress(x, y)
         
-        print("{} slope:{:.5f}, int:{:.5f}, r:{:.5f}, p-value:{:.5f}, se:{:.5f}, x:{}".format(
+        print("{} slope:{:<.5f}, int:{:<.5f}, r:{:<.5f}, p-value:{:<.5f}, se:{:<.5f}, x:{}".format(
                 column, slope, intercept, r_value, p_value, std_err, x))
 
         # Plot the data and the linear regression line
@@ -47,7 +45,37 @@ def saveResults(results_df, school_name, section_name, start_year, end_year):
         ax.set_xticks(results_df.index)
         ax.set_xticklabels(results_df.year)
         
-    plt.suptitle(f"Trending of {school_name}'s {section_name} on Diversity metrics")
-    filename = "-".join([school_name, section_name, str(start_year), str(end_year)])
+    plt.suptitle(title, fontsize=18)
+    return plt
 
-    plt.savefig("output/"+filename+".png")
+def showKeyTopicsResults(results_df, title, columns):
+    # Create a figure with subplots
+    fig, axs = plt.subplots(nrows=1, ncols=len(columns), sharex=True, figsize=(16,4))
+
+    # Loop through the columns and plot each one
+    for ax, column in zip(axs, columns):
+        # Select the data for the current column
+        x = range(len(results_df.index))
+        y = results_df[column]
+
+        # Calculate the linear regression
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+
+        print("{} slope:{:.5f}, int:{:.5f}, r:{:.5f}, p:{:.5f}, se:{:.5f}, x:{}".format(
+                column, slope, intercept, r_value, p_value, std_err, x))
+
+        # Plot the data and the linear regression line
+        results_df[column].plot(ax=ax, style=".", x=x, y=y, label=column)
+        ax.plot(x, intercept + slope*x, 'b:', label='regression')
+        ax.set_ylim(0, max(y)*1.2)
+
+        # Add a legend
+        ax.set_title(column + ' slope: ' + "{:.1e}".format(slope), fontsize=10)
+        ax.legend(loc='lower center')
+
+        # Add x-label for the years
+        ax.set_xticks(results_df.index)
+        ax.set_xticklabels(results_df.year)
+
+    plt.suptitle(title, fontsize=18)
+    return plt
