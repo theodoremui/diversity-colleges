@@ -3,8 +3,8 @@ import pandas as pd
 import ouraws
 
 OUTPUT_DIR="data"
-SCHOOL="wellesley"
-SUBJECT="opinions"
+SCHOOL="harvard"
+SUBJECT="opinion"
 # SCHOOL="stanford"
 # SUBJECT="opinions"
 
@@ -24,3 +24,9 @@ if __name__ == "__main__":
 
     # Latest article is first row: df.iloc[0]
     print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
+
+    end_year = df.iloc[0][-3]
+    start_year = df.iloc[-1][-3]
+    for year in range(start_year, end_year+1):
+        year_df = df[df.year==year]
+        print(f"{year}\t{year_df.shape[0]}")
