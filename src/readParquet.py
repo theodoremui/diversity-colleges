@@ -3,10 +3,8 @@ import pandas as pd
 import ouraws
 
 OUTPUT_DIR="data"
-SCHOOL="harvard"
-SUBJECT="opinion"
-# SCHOOL="stanford"
-# SUBJECT="opinions"
+SCHOOL= "swarthmore"
+SUBJECT="opinions"
 
 FILENAME=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 

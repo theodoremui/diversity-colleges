@@ -50,7 +50,8 @@ def showTopicsResults(results_df, title, columns):
 
 def showKeyTopicsResults(results_df, title, columns):
     # Create a figure with subplots
-    fig, axs = plt.subplots(nrows=1, ncols=len(columns), sharex=True, figsize=(16,4))
+    fig, axs = plt.subplots(nrows=len(columns), ncols=1, sharex=True, 
+                            figsize=(8,3*len(columns)))
 
     # Loop through the columns and plot each one
     for ax, column in zip(axs, columns):
