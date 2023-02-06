@@ -34,7 +34,7 @@ LISTING_BASE_URL = f"https://www.thecrimson.com/tag/columns/page/"
 [ 
     f"https://www.thecrimson.com/tag/op-eds/page/", # (h1) 1-116, (h2) 117-190
     f"https://www.thecrimson.com/tag/editorials/page/", # (h1) 1-77, (h2) 78-124
-    f"https://www.thecrimson.com/tag/columns/page/" #1-120
+    f"https://www.thecrimson.com/tag/columns/page/" #1-120 ... 224
 ]
 
 DATE_PATTERN = re.compile("https://www.thecrimson.com/article/(\d+)/(\d+)/(\d+)")
