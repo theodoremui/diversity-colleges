@@ -14,8 +14,8 @@ import os
 BIPARTISAN_API_KEY = os.environ.get("BIPARTISAN_API_KEY")
 
 url = "https://api.thebipartisanpress.com/api/endpoints/beta/robert"
-data = {"API": BIPARTISAN_API_KEY, "Text": "trump is bad"}
+payload = {"API": BIPARTISAN_API_KEY, "Text": "trump is bad"}
 
-response = requests.post(url, data=data)
+response = requests.post(url, data=payload)
 
 print(response.text)
