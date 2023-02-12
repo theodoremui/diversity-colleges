@@ -9,6 +9,7 @@
 # Retry logic: bit.ly/requests-retry
 #########################################################################
 
+import os
 import random
 import time
 
@@ -21,14 +22,16 @@ BAD_HTTP_CODES = (400,401,403,404,406,408,409,410,429,500,502,503,504)
 USER_AGENT = UserAgent()
 
 HTTP_RETRIES = 6
+SCRAPINGDOC_API_KEY=os.environ.get('SCRAPINGDOC_API_KEY')
 SCRAPINGDOG_PROXY='https://api.scrapingdog.com/scrape'
-SCRAPINGDOG_PAYLOAD={'api_key': '63aca867fda5fa7f621167df', 
+SCRAPINGDOG_PAYLOAD={'api_key': SCRAPINGDOC_API_KEY, 
                     'url': '', 'wait':'5000', 'session_number':''}
 
 COUNTRY_CODE=['us','eu']
+SCRAPERAPI_API_KEY=os.environ.get('SCRAPERAPI_API_KEY')
 SCRAPERAPI_DEVICETYPE=['desktop', 'mobile']
 SCRAPERAPI_PROXY='http://api.scraperapi.com'
-SCRAPERAPI_PAYLOAD={'api_key': 'e370e7bd849ffb73b878cdc05368f28e',
+SCRAPERAPI_PAYLOAD={'api_key': SCRAPERAPI_API_KEY,
                     'url': '', 'device_type': ''}
 
 HEADERS  = [
