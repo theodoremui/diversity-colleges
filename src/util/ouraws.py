@@ -60,3 +60,17 @@ def saveByYear(df, output_dir, prefix):
     for y in range(oldest_year, latest_year+1):
         print(f"{y} has {df[df.year == y].shape[0]} articles")
         ouraws.putToS3(f"{output_dir}/{prefix}-{y}.parquet", df[df.year == y])
+
+
+def saveNewResults(new_results, primary_key, output_name):
+    new_df = pd.DataFrame.from_records(new_results)
+    stored_df = ouraws.getFromS3(output_name)
+    if stored_df is None or stored_df.size == 0:
+        stored_df = new_df
+    else:
+        stored_df = stored_df[~ stored_df[primary_key].isin(new_df[primary_key])]
+        stored_df = pd.concat([stored_df, new_df])
+
+    print(f"\t{output_name}: {stored_df.shape}")
+    ouraws.putToS3(output_name, stored_df)
+    return stored_df
