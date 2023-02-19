@@ -1,6 +1,6 @@
 #########################################################################
-# harvardPolitics.py
-# ------------------
+# harvardBipartisan.py
+# --------------------
 # Calculating bipartisan score per year for Harvard
 # 
 # @author Theodore Mui
@@ -18,12 +18,12 @@ import time
 import queue
 import pandas as pd
 
-from util.ouraws import getFromS3, saveNewResults
+from util.ouraws import getFromS3, saveBipartisanResults
 from util.convert import safeFloat
 
 SCHOOL="harvard"
 SUBJECT="opinion"
-START_YEAR=2010
+START_YEAR=2013
 FINAL_YEAR=2022
 DATA_DIR="data"      # should be 'data'
 OUTPUT_DIR="output"  # should be 'output'
@@ -32,21 +32,7 @@ S3_POLITICS_KEY = f"{DATA_DIR}/{SCHOOL}-POLARITY.parquet"
 
 BIPARTISAN_API_KEY = os.environ.get("BIPARTISAN_API_KEY")
 BIPARTISAN_URL = "https://api.thebipartisanpress.com/api/endpoints/beta/robert"
-NUM_PARALLEL_TASKS = 4
-
-
-# Local results storage
-# def saveNewResults(new_results, primary_key, output_name):
-#     new_df = pd.DataFrame.from_records(new_results)
-#     stored_df = pd.read_parquet(output_name)
-#     if stored_df is None or stored_df.size == 0:
-#         stored_df = new_df
-#     else:
-#         stored_df = stored_df[~ stored_df[primary_key].isin(new_df[primary_key])]
-#         stored_df = pd.concat([stored_df, new_df])
-#     print(f"\t{output_name}: {stored_df.shape}")
-#     stored_df.to_parquet(output_name)
-#     return stored_df
+NUM_PARALLEL_TASKS = 10
 
 
 def tabulateYearlyResults(year, results_queue):
@@ -64,17 +50,24 @@ def tabulateYearlyResults(year, results_queue):
         'polarity_avg': 0 if article_count==0 else float(value_sum)/article_count
     }
 
-
-def getBipartisanScore(index, text, q):
+import random
+def getBipartisanScore(index, text):
     payload = {"API": BIPARTISAN_API_KEY, "Text": text.encode("utf-8")}
+    time.sleep(0.1 * random.randint(0, 100)/100)
     response = requests.post(BIPARTISAN_URL, data=payload)
-    q.put(response.text) # results are string type
+    return response.text # results are string type
 
 
-def queryBipartisan(articles_list, max_articles, results_queue, num_threads=5):
+def storeBipartisanScore(index, text, q):
+    scoreText = getBipartisanScore(index, text)
+    q.put(scoreText) # results are string type
+
+
+def queryBipartisanWithThreads(articles_list, max_articles, results_queue, 
+                              num_threads=5):
     threads = []
     for index, article in enumerate(articles_list):
-        t = threading.Thread(target=getBipartisanScore,
+        t = threading.Thread(target=storeBipartisanScore,
                             args=(index, article, results_queue))
         threads.append(t)
         t.start()
@@ -85,6 +78,26 @@ def queryBipartisan(articles_list, max_articles, results_queue, num_threads=5):
             print("o", end="", flush=True)
         if (index+1) == max_articles: break
 
+
+def getBipartisanBatch(year, articles_list, max_articles):
+    value_sum = 0.0
+    article_count = 0
+    for index, article in enumerate(articles_list):
+        scoreText = getBipartisanScore(index, article)
+        val = safeFloat(scoreText)
+        if val is not None:
+            value_sum += val
+            article_count += 1
+        if (index+1) % NUM_PARALLEL_TASKS == 0:
+            print("o", end="", flush=True)
+        if (index+1) == max_articles: break
+
+    return {
+        'year': year,
+        'article_count': article_count,
+        'polarity_sum': value_sum,
+        'polarity_avg': 0 if article_count==0 else float(value_sum)/article_count
+    }
 
 def processArticles(df, start_year, end_year, MAX_PER_YEAR=1e8):
     results = []
@@ -97,16 +110,15 @@ def processArticles(df, start_year, end_year, MAX_PER_YEAR=1e8):
         num_articles = min(MAX_PER_YEAR, len(articles_list))
         if num_articles > 0:
             results_queue = queue.Queue()
-            queryBipartisan(articles_list, num_articles, 
-                            results_queue, NUM_PARALLEL_TASKS)
-            yearResults = tabulateYearlyResults(year, results_queue)
+            yearResults = getBipartisanBatch(year, articles_list, num_articles)
             print("\t{:4}\t{:.2f}s\t{:.2f}".format(
                 yearResults['article_count'],
                 time.time() - start_time,
                 yearResults['polarity_avg']
             ), flush=True)
             results.append(yearResults)
-            saveNewResults(results, primary_key='year', output_name=S3_POLITICS_KEY)
+            saveBipartisanResults(results, primary_key='year', 
+            output_name=S3_POLITICS_KEY)
         else: print(f"NONE")
     return results
 
@@ -116,5 +128,5 @@ if __name__ == '__main__':
     print(f"Every 'o' is ~{NUM_PARALLEL_TASKS} articles")
     print(f"{SCHOOL} data: {df.shape}")
 
-    results = processArticles(df, START_YEAR, FINAL_YEAR, MAX_PER_YEAR=2)
+    results = processArticles(df, START_YEAR, FINAL_YEAR) #, MAX_PER_YEAR=10)
     print(f"Successfully processed {len(results)} years")

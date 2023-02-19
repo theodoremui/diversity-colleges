@@ -66,7 +66,7 @@ def saveByYear(df, output_dir, prefix):
         ouraws.putToS3(f"{output_dir}/{prefix}-{y}.parquet", df[df.year == y])
 
 
-def saveNewResults(new_results, primary_key, output_name):
+def saveBipartisanResults(new_results, primary_key, output_name):
     new_df = pd.DataFrame.from_records(new_results)
     stored_df = ouraws.getFromS3(output_name)
     if stored_df is None or stored_df.size == 0:
