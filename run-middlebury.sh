@@ -6,4 +6,5 @@
 #     - to watch growth of log:
 #           `watch -n 5 "ls -la ./brown-opinion-LATEST.log"`
 #
-unbuffer python ./src/brown2parquet.py 1 224 3 2>&1 | tee -a ./data/brown-opinion-LATEST.log
+# unbuffer python ./src/middlebury2parquet.py 1 5 3 2>&1 | tee -a ./data/middlebury-opinion-LATEST.log
+unbuffer python ./src/middlebury2parquet.py 7 151 3 2>&1 | tee -a ./data/middlebury-opinion-LATEST.log

@@ -10,16 +10,16 @@ from bs4 import *
 
 import ouraws
 import ourrequests
-RETRIES = 2
+RETRIES = 0
 CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
 OUTPUT_DIR="data"
-SCHOOL="brown"
-SUBJECT="opinions"
+SCHOOL="middlebury"
+SUBJECT="opinion" # check if this is 'opinion'
 CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-DATE_PATTERN = re.compile("https://www.browndailyherald.com/article/(\d+)/(\d+)")
-LISTING_BASE_URL = f"https://www.browndailyherald.com/section/{SUBJECT}"
+DATE_PATTERN = re.compile("https://www.middleburycampus.com/article/(\d+)/(\d+)")
+LISTING_BASE_URL = f"https://www.middleburycampus.com/section/{SUBJECT}"
 
 def getArticleText(url, numRetries, useProxy=False):
     attempts = 0
@@ -30,7 +30,8 @@ def getArticleText(url, numRetries, useProxy=False):
         if attempts > 2: useProxy = True
         html = ourrequests.requestHtml(url, attempts, useProxy)
         soup = BeautifulSoup(html, 'html.parser')
-        bodyObj  = soup.select_one("div[class^='article-content']")
+#         bodyObj = soup.select_one("div[class^='article-content']") #for pages 1-5
+        bodyObj  = soup.select_one("div[class^='imported article-content']") # for pages 7 and after
         if bodyObj != None:  body  = bodyObj.text
         attempts += 1
 
@@ -41,12 +42,8 @@ def getArticleText(url, numRetries, useProxy=False):
     print(f"\t\t\t{len(text)} ...{text[-18:]}")
     return text
 
-# ARTICLE_BASE_URL = f"https://www.browndailyherald.com/section/opinions/"
 ARTICLE_SELECTOR = \
-    "div[class^='catlist-textarea'] > h2 > a[class^='homeheadline']"
-
-ARTICLE_SELECTOR = \
-    "div[class^='col-12 col-lg-4'] > " + \
+    "div[class^='col-12 col-md-4'] > " + \
     "div[class^='image-container'] > " + \
     "a[href^='http']"
 
@@ -160,7 +157,8 @@ if __name__ == "__main__":
 # Testing getting a specific content page or list of content
 #############
 # if __name__ == "__main__":
-#     url = 'https://www.browndailyherald.com/article/2010/01/nida-abdulla-11-5-a-meal-credit-or-a-snack-credit'
+
+#     url = 'https://www.middleburycampus.com/article/2001/10/students-blind-to-worlds-realities'
 #     date_groups = DATE_PATTERN.search(url)
 #     print(int(date_groups.group(1)))
 #     print(int(date_groups.group(2)))
@@ -173,7 +171,7 @@ if __name__ == "__main__":
 #############
 # if __name__ == "__main__":
 #     print("starting")
-#     articleList = getArticleList(LISTING_BASE_URL+"?page="+str(210)+"&per_page=20", 
+#     articleList = getArticleList(LISTING_BASE_URL+"?page="+str(100)+"&per_page=20", 
 #                                  RETRIES, True)
 #     print("got list")
 #     print(len(articleList))
