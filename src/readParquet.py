@@ -1,3 +1,23 @@
+#########################################################################
+# readParquet.py
+# ------------------
+# outputting number of articles for each year for a particular school's college 
+# newspaper in a specific subject area
+# 
+# Usage:
+#        > python src/readParquet <school> <subject>
+#
+# where:
+#        school  = name of school such as "harvard"
+#        subject = section in school newspaper such as "opinion" or "opinions"
+#
+# @author Theodore Mui
+# @email theodoremui@gmail.com
+# @date Sun Feb 19 17:37:21 PST 2023
+#
+# Retry logic: bit.ly/requests-retry
+#########################################################################
+
 import os
 import sys
 import pandas as pd
