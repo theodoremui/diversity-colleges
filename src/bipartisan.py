@@ -21,10 +21,10 @@ import pandas as pd
 from util.ouraws import getFromS3, saveBipartisanResults
 from util.convert import safeFloat
 
-SCHOOL="harvard"
+SCHOOL="berkeley"
 SUBJECT="opinion"
-START_YEAR=2013
-FINAL_YEAR=2022
+START_YEAR=2010
+FINAL_YEAR=2020
 DATA_DIR="data"      # should be 'data'
 OUTPUT_DIR="output"  # should be 'output'
 
@@ -45,7 +45,7 @@ def tabulateYearlyResults(year, results_queue):
         'year': year,
         'article_count': article_count,
         'polarity_sum': value_sum,
-        'polarity_avg': 0 if article_count==0 else float(value_sum)/article_count
+        'polarity_avg': 0 if article_count == 0 else float(value_sum)/article_count
     }
 
 import random
