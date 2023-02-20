@@ -1,19 +1,36 @@
+#########################################################################
+# readParquet.py
+# ------------------
+# outputting number of articles for each year for a particular school's college 
+# newspaper in a specific subject area
+# 
+# Usage:
+#        > python src/readParquet <school> <subject>
+#
+# where:
+#        school  = name of school such as "harvard"
+#        subject = section in school newspaper such as "opinion" or "opinions"
+#
+# @author Theodore Mui
+# @email theodoremui@gmail.com
+# @date Sun Feb 19 17:37:21 PST 2023
+#
+# Retry logic: bit.ly/requests-retry
+#########################################################################
+
 import os
+import sys
 import pandas as pd
 import ouraws
 
 OUTPUT_DIR="data"
-SCHOOL= "dartmouth"
-SUBJECT="opinion"
 
-FILENAME=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
+def getStoredArticles(filename):
+    return ouraws.getFromS3(filename)
 
-def getStoredArticles():
-    return ouraws.getFromS3(FILENAME)
-
-if __name__ == "__main__":
-    print(f"reading from {FILENAME}")
-    df = getStoredArticles()
+def printResults(filename):
+    print(f"reading from {filename}")
+    df = getStoredArticles(filename)
 
     print(f"Number of records: {df.shape}")
     
@@ -28,3 +45,24 @@ if __name__ == "__main__":
     for year in range(start_year, end_year+1):
         year_df = df[df.year==year]
         print(f"{year}\t{year_df.shape[0]}")
+
+
+def printUsage(progname):
+    print("Usage: python {} <school> <subject>".format(
+        progname
+    ))
+
+if __name__ == "__main__":
+
+    if len(sys.argv) != 3:
+        printUsage(sys.argv[0]) 
+        sys.exit(0)
+
+    try:
+        school  = sys.argv[1]
+        subject = sys.argv[2]
+        filename=f"{OUTPUT_DIR}/{school}-{subject}-SNAPSHOT.parquet"
+        printResults(filename)
+
+    except Exception as e:
+        print(f"Exception: {e}")
