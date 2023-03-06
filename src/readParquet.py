@@ -32,16 +32,17 @@ def printResults(filename):
     print(f"reading from {filename}")
     df = getStoredArticles(filename)
 
+    df = df.sort_values('year')
     print(f"Number of records: {df.shape}")
     
     # In reverse order: earlier article is last row: df.iloc[-1]
-    print(f"Earliest: {df.iloc[-1][-3]}-{df.iloc[-1][-2]}-{df.iloc[-1][-1]}")
+    print(f"Latest: {df.iloc[-1][-3]}-{df.iloc[-1][-2]}-{df.iloc[-1][-1]}")
 
     # Latest article is first row: df.iloc[0]
-    print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
+    print(f"Earliest: {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
 
-    end_year = df.iloc[0][-3]
-    start_year = df.iloc[-1][-3]
+    start_year = df.iloc[0][-3]
+    end_year = df.iloc[-1][-3]
     for year in range(start_year, end_year+1):
         year_df = df[df.year==year]
         print(f"{year}\t{year_df.shape[0]}")

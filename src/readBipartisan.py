@@ -12,7 +12,7 @@ def getStoredResults():
 
 if __name__ == "__main__":
     print(f"reading from {S3_POLITICS_KEY}")
-    df = getStoredResults()
+    results_df = getStoredResults()
 
-    print(f"Number of records: {df.shape}")
-    print(df.sort_values(by='year', ascending=True))
+    print(f"Number of records: {results_df.shape}")
+    print(results_df.sort_values(by='year', ascending=True))
