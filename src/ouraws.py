@@ -16,13 +16,17 @@ import pyarrow.parquet as pq
 
 S3_BUCKET="collegier"
 
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
 s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, 
                   aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
 def getFromS3(s3object_key):
     df = None
+
+    # for key in s3.list_objects(Bucket=S3_BUCKET)['Contents']:
+    #     print(key['Key'])
     try:
         s3.download_file(S3_BUCKET, s3object_key, s3object_key)
         df = pd.read_parquet(s3object_key)
