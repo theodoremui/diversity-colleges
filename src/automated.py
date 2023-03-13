@@ -87,7 +87,10 @@ def getArticles(listingBaseURL, articleBaseURL, pageList, checkpoint_filename, a
         else:
             for article in articleList:
                 url = articleBaseURL + article.get('href')
-                if date_in_url: date_groups = DATE_PATTERN.search(url)
+                
+                if date_in_url:
+                    date_pattern = re.compile(article_information[4])
+                    date_groups = date_pattern.search(url)
                 
                 if article.text != None and len(article.text) > 0 and \
                    url is not None and len(url) > 10:
