@@ -95,6 +95,7 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
             for article in articleList:
                 url = BASE_URL + article.get('href')
                 date_groups = DATE_PATTERN.search(url)
+                # print(date_groups)
                 if article.text != None and len(article.text) > 0 and \
                    url is not None and len(url) > 10:
                     body = getArticleText(url, RETRIES)
