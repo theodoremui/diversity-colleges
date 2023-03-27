@@ -1,3 +1,4 @@
+
 import os
 import re
 import random
@@ -10,15 +11,15 @@ from bs4 import *
 
 import ouraws
 import ourrequests
-RETRIES = 6
+RETRIES = 2
 CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
 OUTPUT_DIR="data"
-SCHOOL="minnesota"
+SCHOOL="byu"
 SUBJECT="opinion"
 CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-LISTING_BASE_URL = f"https://mndaily.com/category/opinion/page/"
+LISTING_BASE_URL = f"https://universe.byu.edu/category/opinion/page/"
 
 DATE_FORMAT="%B %d, %Y"
 def getArticleText(url, numRetries, useProxy=False):
@@ -30,23 +31,25 @@ def getArticleText(url, numRetries, useProxy=False):
         if attempts > 3: useProxy = True
         html = ourrequests.requestHtml(url, attempts, useProxy)
         soup = BeautifulSoup(html, 'html.parser')
-        titleObj = soup.select_one("div[role^='main'] > h1[class^='storyheadline']")
-        contentObj = soup.select_one("div[role^='main'] > span[class^='storycontent']")
-        dateObj = soup.select_one("span[class^='time-wrapper']")
+        titleObj = soup.select_one("article header.td-post-title > h1[class^='entry-title']")
+        contentObj  = soup.select_one("div[class^='td-post-content'] > div[class^='pf-content']")
+        dateObj = soup.select_one("time[class^='entry-date updated td-module-date']")
         if titleObj is not None: content = titleObj.text.strip() + "\n"
         if contentObj is not None:  content += contentObj.text.strip()
-        length = int(len(dateObj.text))
-        if dateObj is not None: dateObj = datetime.strptime(dateObj.text[11:length], DATE_FORMAT)
+        if dateObj is not None:
+            dateObj = datetime.strptime(dateObj.text, DATE_FORMAT)
+        else:
+            dateObj = None
         attempts += 1
 
         # give the website a small break before next ping
         time.sleep(random.randint(0, 100 * attempts) / 1000.0)
 
-    print(f"\t\t\t{len(content)} ...{content[-18:]}")
+    # print(f"\t\t\t{len(content)} ...{content[-18:]}")
     return content, dateObj
 
 ARTICLE_SELECTOR = \
-    "div[class^='postarea archivepage catlist_with_sidebar'] div[class^='profile-rendered catlist-panel catlist_sidebar'] h2 > a[href^='https://mndaily.com/']"
+    "div[class^='td-module-meta-info'] h3[class^='entry-title td-module-title'] > a[href^='https://universe.byu.edu/']"
 
 def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
     ''' Get articles linked off listing pages
@@ -61,7 +64,7 @@ def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
         soup = BeautifulSoup(html, "html.parser")
         list = soup.select(ARTICLE_SELECTOR)
         if list is not None and len(list) > 0: articleList += list
-        if showProgress: print(f"\tretrieved: {len(articleList)}")
+        #if showProgress: print(f"\tretrieved: {len(articleList)}")
         attempts += 1
     return articleList
 
@@ -77,25 +80,26 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
         else:
             for article in articleList:
                 url = article.get('href')
+                print (url)
                 if article.text != None and len(article.text) > 0 and \
                    url is not None and len(url) > 10:
                     body, dateObj = getArticleText(url, RETRIES)
-                    articles.append({
-                        'title' : article.text.strip("\"").strip(),
-                        'url'   : url,
-                        'body'  : body,
-                        'year'  : dateObj.year,
-                        'month' : dateObj.month,
-                        'day'   : dateObj.day
-                    })
+                    if (dateObj != None):
+                        articles.append({
+                        'title': article.text.strip("\"").strip(),
+                        'url': url,
+                        'body': body,
+                        'year': dateObj.year,
+                        'month': dateObj.month,
+                        'day': dateObj.day
+                        })
                     wordCount += body.count(' ')
         if pageNumber % CHECKPOINT_FREQUENCY == 0:
             ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
         if showProgress:
             print("-> {} : {} : {} : {} : {}"
                   .format(pageNumber, len(articleList), wordCount,
-                          baseURL+str(pageNumber), dateObj))
-            print(f"\t{failedPages}")
+                          baseURL + str(pageNumber), dateObj))
         pageNumber += 1
     df = ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
     return df, failedPages
@@ -103,17 +107,20 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
 def startProcessing(startPage, endPage, numRetries):
     df, failedPages = getArticles(LISTING_BASE_URL, range(startPage,endPage+1),
                                   showProgress=True)
+    """ 
     while len(failedPages) > 0 and numRetries > 0:
-        retry_df, failedPages = getArticles(LISTING_BASE_URL,
-                                            failedPages,
-                                            showProgress=True,
-                                            useProxy=True)
+        #retry_df, failedPages = getArticles(LISTING_BASE_URL,
+                                            #failedPages,
+                                            #showProgress=True,
+                                            #useProxy=True)
         # merging together retrieved articles with newly retrieved ones
         if not retry_df.empty:
             df = df[~ df['url'].isin(retry_df['url'])]
             df = pd.concat([df, retry_df])
         print(f"failed pages: {failedPages}")
         numRetries -= 1
+    """
+
 
     # DataFrame df has dimensions of (# articles, #attributes)
     print("Total articles: {}, each with attributes: {}"
@@ -125,8 +132,8 @@ def startProcessing(startPage, endPage, numRetries):
     # Latest article is first row: df.iloc[0]
     print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
 
-    #ouraws.saveByYear(df, output_dir=OUTPUT_DIR,
-                    #prefix=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}")
+    ouraws.saveByYear(df, output_dir=OUTPUT_DIR,
+                    prefix=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}")
 
 
 def printUsage(progname):
@@ -134,6 +141,9 @@ def printUsage(progname):
         progname
     ))
 
+#=====================================================================
+# main
+#=====================================================================
 if __name__ == "__main__":
 
     if len(sys.argv) != 4:
@@ -148,7 +158,3 @@ if __name__ == "__main__":
         startProcessing(startPage, endPage, numRetries)
     except Exception as e:
         print(f"Exception: {e}")
-
-
-
-
