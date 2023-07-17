@@ -1,20 +1,23 @@
 #########################################################################
-# harvard2parquet.py
+# nevada2parquet.py
 # ------------------
-# Scraping Harvard University student paper opinion pieces with proxy services & 
+# Scraping UNC-Chapel Hill University student paper opinion pieces with proxy services & 
 # saving to S3
 # 
-# @author Phil Mui
-# @email thephilmui@gmail.com
-# @date Wed Jan 25 16:03:05 PST 2023
+# @author Theodore Mui
+# @email theodoremui@gmail.com
+# @date Mon Jan 16 22:52:02 PST 2023
 #
 # Retry logic: bit.ly/requests-retry
 #########################################################################
 
-import random
+import os
 import re
+import random
 import sys
 import time
+import pprint as pp
+import asyncio
 import pandas as pd
 from datetime import datetime
 from bs4 import *
@@ -25,40 +28,48 @@ RETRIES = 6
 CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
 OUTPUT_DIR="data"
-SCHOOL="harvard"
+SCHOOL="unc"
 SUBJECT="opinion"
 CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-LISTING_BASE_URL = f"https://www.thecrimson.com/tag/columns/page/"
+LISTING_BASE_URL = f"https://www.dailytarheel.com/section/opinion?page="
 
-[ 
-    f"https://www.thecrimson.com/tag/op-eds/page/", # (h1) 1-116, (h2) 117-190
-    f"https://www.thecrimson.com/tag/editorials/page/", # (h1) 1-77, (h2) 78-124
-    f"https://www.thecrimson.com/tag/columns/page/" #1-120 ... 224
-]
-
-DATE_PATTERN = re.compile("https://www.thecrimson.com/article/(\d+)/(\d+)/(\d+)")
-
+DATE_FORMAT= "%B %d, %Y"
 def getArticleText(url, numRetries, useProxy=False):
     attempts = 0
     content = ""
+    dateObj = None
     while attempts <= numRetries and len(content) < 5: 
         # only use proxy if we have tried and failed in attempt 0
         if attempts > 3: useProxy = True
         html = ourrequests.requestHtml(url, attempts, useProxy)
         soup = BeautifulSoup(html, 'html.parser')
-
-        titleObj = soup.select_one("div[class^='css'] > h1[class^='css']")
-        contentObj  = soup.select_one("div[class^='css'] > div[class^='css-85imjw']")
-        if titleObj is not None:  content = titleObj.text.strip() + "\n"
+        titleObj = soup.select_one("article.full-article h1")
+        contentObj = soup.select_one("div.article-content p")
+        dateObj = soup.select_one("aside.author-name div.mt-1 span")
+        #contentObj = soup.select("div.post-content")
+        #print(contentObj)
+        #pp.pprint(contentObj)
+        #print(dateObj)
+        if titleObj is not None: content = titleObj.text.strip() + "\n"
         if contentObj is not None:  content += contentObj.text.strip()
+        if dateObj is not None: 
+            dateObj = dateObj.text.strip()
+            dateObj = re.sub(" \| .*", "", dateObj)
+            dateObj = datetime.strptime(dateObj, DATE_FORMAT)
         attempts += 1
-
-        # give the website a small break before next ping
+        #print(dateObj)
+        #give the website a small break before next ping
         time.sleep(random.randint(0, 100 * attempts) / 1000.0)
 
     print(f"\t\t\t{len(content)} ...{content[-18:]}")
-    return content
+    return content, dateObj
+
+ARTICLE_SELECTOR = \
+    "article.art-left h2.headline a[href^='https://www.dailytarheel.com/']"
+# ARTICLE_SELECTOR = \
+#     ".homeheadline"
+
 
 def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
     ''' Get articles linked off listing pages
@@ -71,17 +82,16 @@ def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
         if attempts > 3: useProxy = True
         html = ourrequests.requestHtml(listUrl, attempts, useProxy)
         soup = BeautifulSoup(html, "html.parser")
-        articles = soup.select("h1 > a[href^='/article/']")
-        if articles is not None and len(articles) > 0: articleList += articles
-        articles = soup.select("h2 > a[href^='/article/']")
-        if articles is not None and len(articles) > 0: articleList += articles
-
+        list = soup.select(ARTICLE_SELECTOR)
+        #print(list)
+        #print(listUrl)
+        #input("wait")
+        if list is not None and len(list) > 0: articleList += list
         if showProgress: print(f"\tretrieved: {len(articleList)}")
         attempts += 1
 
     return articleList
 
-BASE_URL = "https://www.thecrimson.com"
 def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
     failedPages = []
     articles = []
@@ -93,27 +103,28 @@ def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
         if len(articleList) == 0: failedPages.append(pageNumber)
         else:
             for article in articleList:
-                url = BASE_URL + article.get('href')
-                date_groups = DATE_PATTERN.search(url)
-                # print(date_groups)
+                url = article.get('href')
+                print(url)
                 if article.text != None and len(article.text) > 0 and \
                    url is not None and len(url) > 10:
-                    body = getArticleText(url, RETRIES)
-                    articles.append({ 
-                        'title' : article.text,
-                        'url'   : url,
-                        'body'  : body,
-                        'year'  : int(date_groups.group(1)), # year
-                        'month' : int(date_groups.group(2)), # month
-                        'day'   : int(date_groups.group(3))  # day
-                    })
+                    body, dateObj = getArticleText(url, RETRIES)
+                    if dateObj != None:
+                        articles.append({ 
+                            'title' : article.text.strip("\"").strip(),
+                            'url'   : url,
+                            'body'  : body,
+                            'year'  : dateObj.year,
+                            'month' : dateObj.month,
+                            'day'   : dateObj.day
+                        })
                     wordCount += body.count(' ')
+        #pp.pprint(articles)
         if pageNumber % CHECKPOINT_FREQUENCY == 0: 
             ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
         if showProgress: 
             print("-> {} : {} : {} : {} : {}"
                   .format(pageNumber, len(articleList), wordCount, 
-                          baseURL+str(pageNumber), int(date_groups.group(1))))
+                          baseURL+str(pageNumber), dateObj))
             print(f"\t{failedPages}")
         pageNumber += 1
     df = ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
@@ -137,6 +148,9 @@ def startProcessing(startPage, endPage, numRetries):
     # DataFrame df has dimensions of (# articles, #attributes)
     print("Total articles: {}, each with attributes: {}"
             .format(df.shape[0], df.shape[1]))
+
+    #remove diplicate rows
+    df = df.drop_duplicates(subset=['title'])
 
     # In reverse order: earlier article is last row: df.iloc[-1]
     print(f"Earliest: {df.iloc[-1][-3]}-{df.iloc[-1][-2]}-{df.iloc[-1][-1]}")

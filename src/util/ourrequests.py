@@ -85,8 +85,6 @@ async def asyncGet(url):
 HTTP_RETRIES = 5
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
 CHROME_OPTIONS = Options()
 CHROME_PREFS = {"profile.managed_default_content_settings.images": 2,
                 "profile.managed_default_content_settings.javascript": 2}

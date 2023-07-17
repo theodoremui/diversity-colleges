@@ -12,9 +12,12 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["berkeley", "opinion", "2011", "2012"],
+      "args": ["1", "1", "1"],
       "purpose": ["debug-in-terminal"]
     }
   ]
 }
+
+// for running 'topicmodeling-general.py'
+// "args": ["berkeley", "opinion", "2011", "2012"],
 

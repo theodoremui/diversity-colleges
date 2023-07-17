@@ -1,101 +1,154 @@
 import os
 import re
-import requests
 import random
+import sys
 import time
+import asyncio
 import pandas as pd
-from urllib.parse import urlparse
+from datetime import datetime
 from bs4 import *
 
-SCHOOL = "minnesota"
-SUBJECT = "opinion"
-OUTPUT_DIR = "./data"
-DATE_PATTERN = re.compile("opinion/opinion")
-BASE_URL = f"https://mndaily.com/category/{SUBJECT}/page/"
-HEADER = {'User-Agent': 'Mozilla/5.0'}
+import ouraws
+import ourrequests
+RETRIES = 6
+CHECKPOINT_FREQUENCY = 10 # every 10 pages
 
-SCHEMA = {'url': str, 'body': str,
-          'year': int, 'month': int, 'day': int}
+OUTPUT_DIR="data"
+SCHOOL="minnesota"
+SUBJECT="opinion"
+CHECKPOINT_FILENAME  = f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-SNAPSHOT.parquet"
 
-def getArticleText(url):
-    html = requests.get(url, headers=HEADER).text
-    soup = BeautifulSoup(html, 'html.parser')
-    lines = soup.get_text().splitlines()
-    output = ""
+LISTING_BASE_URL = f"https://mndaily.com/category/opinion/page/"
 
-    innerBackground = soup.find(class_ = "innerbackground")
-    timeWrapper = innerBackground.find(class_ = "time-wrapper")
-    dateText = str(timeWrapper)
+DATE_FORMAT="%B %d, %Y"
+def getArticleText(url, numRetries, useProxy=False):
+    attempts = 0
+    content = ""
+    dateObj = None
+    while attempts <= numRetries and len(content) < 5:
+        # only use proxy if we have tried and failed in attempt 0
+        if attempts > 3: useProxy = True
+        html = ourrequests.requestHtml(url, attempts, useProxy)
+        soup = BeautifulSoup(html, 'html.parser')
+        titleObj = soup.select_one("div[role^='main'] > h1[class^='storyheadline']")
+        contentObj = soup.select_one("div[role^='main'] > span[class^='storycontent']")
+        dateObj = soup.select_one("span[class^='time-wrapper']")
+        if titleObj is not None: content = titleObj.text.strip() + "\n"
+        if contentObj is not None:  content += contentObj.text.strip()
+        length = int(len(dateObj.text))
+        if dateObj is not None: dateObj = datetime.strptime(dateObj.text[11:length], DATE_FORMAT)
+        attempts += 1
 
-    year = re.search("20[0-9][0-9]", dateText)
+        # give the website a small break before next ping
+        time.sleep(random.randint(0, 100 * attempts) / 1000.0)
 
-    for line in lines:
-        words = re.split('[\s\t]', line)
-            # only save those lines with at least 3 words
-        if len(words) > 3:output += line + '\n'
+    print(f"\t\t\t{len(content)} ...{content[-18:]}")
+    return content, dateObj
 
-    return (output, year.group(0))
+ARTICLE_SELECTOR = \
+    "div[class^='postarea archivepage catlist_with_sidebar'] div[class^='profile-rendered catlist-panel catlist_sidebar'] h2 > a[href^='https://mndaily.com/']"
 
-def getArticles():
-    df = pd.DataFrame(columns=SCHEMA.keys()).astype(SCHEMA)
-    domainName = urlparse(BASE_URL).netloc
-    pageNumber = 1
-
-    while pageNumber < 100:
-        urlSet = set()
-        print (pageNumber)
-        html = requests.get(BASE_URL+str(pageNumber), headers=HEADER).text
-        print (BASE_URL+str(pageNumber))
+def getArticleList(listUrl, numRetries, showProgress=False, useProxy=False):
+    ''' Get articles linked off listing pages
+        Retry logic: bit.ly/requests-retry
+    '''
+    articleList = []
+    attempts = 0
+    while attempts <= numRetries and len(articleList) == 0:
+        # only use proxy if we have tried and failed in attempt 0
+        if attempts > 3: useProxy = True
+        html = ourrequests.requestHtml(listUrl, attempts, useProxy)
         soup = BeautifulSoup(html, "html.parser")
+        list = soup.select(ARTICLE_SELECTOR)
+        if list is not None and len(list) > 0: articleList += list
+        if showProgress: print(f"\tretrieved: {len(articleList)}")
+        attempts += 1
+    return articleList
 
-        for link in soup.find_all('a'):
-            linkUrl = link.get('href')
-            domain = urlparse(linkUrl).netloc
-            if (domain == domainName):
-                if linkUrl not in df.values:
-                   if ("opinion" in linkUrl):
-                        urlSet.add(linkUrl)
-
-        for url in urlSet:
-            date_groups = DATE_PATTERN.search(url)
-            text,year = getArticleText(url)
-
-            if text != None:
-                 if date_groups:
-                    a = {'url': url,
-                         'body': text,
-                         'year': int(year),
-                         'month': 1,
-                         'day': 1 }
-                    print (year, url)
-
-                    a_df = pd.DataFrame(a, index=[url])
-                    df = pd.concat([df, a_df])
-
+def getArticles(baseURL, pageList, showProgress=False, useProxy=False):
+    failedPages = []
+    articles = []
+    dateObj = None
+    for pageNumber in pageList:
+        articleList = getArticleList(baseURL+str(pageNumber),
+                                     RETRIES, showProgress, useProxy)
+        wordCount = 0
+        if len(articleList) == 0: failedPages.append(pageNumber)
+        else:
+            for article in articleList:
+                url = article.get('href')
+                if article.text != None and len(article.text) > 0 and \
+                   url is not None and len(url) > 10:
+                    body, dateObj = getArticleText(url, RETRIES)
+                    articles.append({
+                        'title' : article.text.strip("\"").strip(),
+                        'url'   : url,
+                        'body'  : body,
+                        'year'  : dateObj.year,
+                        'month' : dateObj.month,
+                        'day'   : dateObj.day
+                    })
+                    wordCount += body.count(' ')
+        if pageNumber % CHECKPOINT_FREQUENCY == 0:
+            ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
+        if showProgress:
+            print("-> {} : {} : {} : {} : {}"
+                  .format(pageNumber, len(articleList), wordCount,
+                          baseURL+str(pageNumber), dateObj))
+            print(f"\t{failedPages}")
         pageNumber += 1
+    df = ouraws.saveNewArticles(articles, checkpoint_name=CHECKPOINT_FILENAME)
+    return df, failedPages
 
-    return (df)
+def startProcessing(startPage, endPage, numRetries):
+    df, failedPages = getArticles(LISTING_BASE_URL, range(startPage,endPage+1),
+                                  showProgress=True)
+    while len(failedPages) > 0 and numRetries > 0:
+        retry_df, failedPages = getArticles(LISTING_BASE_URL,
+                                            failedPages,
+                                            showProgress=True,
+                                            useProxy=True)
+        # merging together retrieved articles with newly retrieved ones
+        if not retry_df.empty:
+            df = df[~ df['url'].isin(retry_df['url'])]
+            df = pd.concat([df, retry_df])
+        print(f"failed pages: {failedPages}")
+        numRetries -= 1
 
-
-def saveByYear(df):
-    if not os.path.exists(OUTPUT_DIR):
-        os.mkdir(OUTPUT_DIR)
-
-    latest_year = df.iloc[-1][-3]
-    oldest_year= df.iloc[0][-3]
-
-    for y in range(oldest_year, latest_year + 1):
-        df[df.year == y].to_parquet(f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}-{y}.parquet")
-        print (str(y) + " saved")
-
-
-if __name__ == "__main__":
-   df = getArticles()
-   df.sort_values('year')
+    # DataFrame df has dimensions of (# articles, #attributes)
+    print("Total articles: {}, each with attributes: {}"
+            .format(df.shape[0], df.shape[1]))
 
     # In reverse order: earlier article is last row: df.iloc[-1]
-   print(f"Earliest: {df.iloc[-1][-3]}-{df.iloc[-1][-2]}-{df.iloc[-1][-1]}")
+    print(f"Earliest: {df.iloc[-1][-3]}-{df.iloc[-1][-2]}-{df.iloc[-1][-1]}")
 
     # Latest article is first row: df.iloc[0]
-   print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
-   saveByYear(df)
+    print(f"Latest:   {df.iloc[0][-3]}-{df.iloc[0][-2]}-{df.iloc[0][-1]}")
+
+    #ouraws.saveByYear(df, output_dir=OUTPUT_DIR,
+                    #prefix=f"{OUTPUT_DIR}/{SCHOOL}-{SUBJECT}")
+
+
+def printUsage(progname):
+    print("Usage: python {} <startPage> <endPage> <numRetries>".format(
+        progname
+    ))
+
+if __name__ == "__main__":
+
+    if len(sys.argv) != 4:
+        printUsage(sys.argv[0])
+        sys.exit(0)
+
+    try:
+        startPage  = int(sys.argv[1])
+        endPage    = int(sys.argv[2])
+        numRetries = int(sys.argv[3])
+        print(f"Processing {SCHOOL} {SUBJECT} from {startPage} to {endPage}")
+        startProcessing(startPage, endPage, numRetries)
+    except Exception as e:
+        print(f"Exception: {e}")
+
+
+
+

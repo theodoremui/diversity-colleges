@@ -1,0 +1,20 @@
+{
+	"Colleges": [
+		{
+			"School": "Julliard",
+			"Subject": "opinion",
+			"Start": 0,
+			"End": 1,
+			"Retries": 1,
+			"Article_Listing_URL": "https://www.juilliard.edu/news-search?page=",
+			"Article_Base_URL": "https://www.juilliard.edu",
+			"Article_Link_Selector": "div[class^='text-inner'] > h2 > a[href^='/news/']",
+			"Title_Selector": "div[class^='article-content'] > h1 > span",
+			"Content_Selector": "div > div[class^='body-text-inner']",
+			"Date_Selector": "span[class='date']",
+			"Date_In_Url": false,
+			"Date_Format": "%A, %b %d, %Y",
+			"Date_Pattern": null
+		}
+	]
+}
