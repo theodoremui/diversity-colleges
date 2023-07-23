@@ -1,0 +1,20 @@
+{
+	"Colleges": [
+		{
+			"School": "CCNY",
+			"Subject": "opinion",
+			"Start": 11,
+			"End": 13,
+			"Retries": 1,
+			"Article_Listing_URL": "https://www.ccny.cuny.edu/news?category=16255&year=all&page=",
+			"Article_Base_URL": "https://www.ccny.cuny.edu",
+			"Article_Link_Selector": "div > h3 > a[href^='/news/']",
+			"Title_Selector": ".page-title",
+			"Content_Selector": "div.body-paragraph:nth-child(2)",
+			"Date_Selector": ".node--news--date > time:nth-child(1)",
+			"Date_In_Url": false,
+			"Date_Format": "%B %d, %Y",
+			"Date_Pattern": null
+		}
+	]
+}
