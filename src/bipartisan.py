@@ -21,10 +21,10 @@ import pandas as pd
 from util.ouraws import getFromS3, saveBipartisanResults
 from util.convert import safeFloat
 
-SCHOOL="harvard"
+SCHOOL="liberty"
 SUBJECT="opinion"
-START_YEAR=2013
-FINAL_YEAR=2022
+START_YEAR=2022
+FINAL_YEAR=2023
 DATA_DIR="data"      # should be 'data'
 OUTPUT_DIR="output"  # should be 'output'
 
