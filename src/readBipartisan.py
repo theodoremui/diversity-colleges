@@ -3,7 +3,7 @@ import pandas as pd
 import ouraws
 
 DATA_DIR="data"
-SCHOOL= "harvard"
+SCHOOL= "berkeley"
 
 S3_POLITICS_KEY = f"{DATA_DIR}/{SCHOOL}-POLARITY.parquet"
 
